@@ -3,7 +3,9 @@
 
 #include <utility>
 #include <cstdlib>
-#include "NonCopyable.hpp"
+#include <cassert>
+#include <algorithm>
+#include <vector>
 
 namespace limonp {
 
@@ -20,7 +22,7 @@ class HashMap {
  private:
   typedef std::pair<KeyT, MappedT> ValueT;
 
-  class LightList: public NonCopyable {
+  class LightList {
    public:
     struct Node {
       ValueT value;
@@ -30,6 +32,14 @@ class HashMap {
     LightList()
       : head_(NULL) {
     }
+    LightList(const LightList& ll)
+      : head_(NULL) {
+      struct Node* node = ll.head_;
+      while (node != NULL) {
+        UniqAppend(node->value);
+        node = node->next;
+      }
+    }
     ~LightList() {
       while (head_ != NULL) {
         Node* x = head_;
@@ -38,6 +48,22 @@ class HashMap {
       }
     }
   
+    //O(n)
+    std::pair<ValueT&, bool> UniqAppend(const ValueT& x) {
+      struct Node** pp = &head_;
+      while ((*pp) != NULL) {
+        if ((*pp)->value == x) {
+          return std::pair<ValueT&, bool>((*pp)->value, false);
+        }
+      }
+      struct Node* node = new Node;
+      node->value = x;
+      node->next = NULL;
+      (*pp) = node;
+      return std::pair<ValueT&, bool>(node->value, true);
+    }
+
+    //O(1)
     void PushFront(const ValueT& x) {
       Node* node = new Node;
       node->value = x;
@@ -45,13 +71,15 @@ class HashMap {
       head_ = node;
     }
    private:
+    LightList& operator = (const LightList& ll);
+
     friend class HashMap;
     friend class Iterator;
 
     Node* head_;
   }; // class LightList
 
-  template<class BucketsT, class NodeT>
+  template<class BucketsT, class NodeT, class ValueT>
   class Iterator {
    public:
     Iterator() {
@@ -60,7 +88,7 @@ class HashMap {
     Iterator& operator ++() {
       assert(node_ != NULL);
       node_ = node_->next;
-      while (node_ == NULL && bucketid_ < maxsize_) {
+      while (node_ == NULL && bucketid_ < buckets_.size()) {
         bucketid_ ++;
         node_ = buckets_[bucketid_]->head_;
       }
@@ -83,39 +111,55 @@ class HashMap {
     }
    private:
     friend class HashMap;
-    Iterator(size_t bucketid, BucketsT buckets, size_t maxsize, NodeT node)
-     : bucketid_(bucketid), buckets_(buckets), maxsize_(maxsize), node_(node) {
+    Iterator(size_t bucketid, BucketsT buckets, NodeT node)
+     : bucketid_(bucketid), buckets_(buckets), node_(node) {
     }
     size_t bucketid_;
     BucketsT buckets_;
-    size_t maxsize_;
     NodeT node_;
   }; // class Iterator
   
  public:
-  typedef Iterator<LightList*, struct LightList::Node*> iterator;
-  typedef Iterator<const LightList*, const struct LightList::Node*> const_iterator;
+  typedef Iterator<const std::vector<LightList>*, const struct LightList::Node*, const ValueT> const_iterator;
 
   HashMap()
-   : buckets_(NULL), size_(0), max_size_(0) {
+   : size_(0) {
   }
   ~HashMap() {
-    //TODO
   }
 
-  MappedT& operator [](const KeyT& key) {
+  bool Insert(const ValueT& v) {
+    size_ ++;
+    if (size_ > buckets_.size()) {
+      const size_t* begin = PRIME_NUMBERS;
+      const size_t* end = PRIME_NUMBERS + sizeof(PRIME_NUMBERS)/sizeof(*PRIME_NUMBERS);
+      const size_t* cur = std::lower_bound(begin, end, size_);
+      if (end != cur) {
+        Rehash(*cur);
+      } else {
+        Rehash(size_);
+      }
+    }
+
+    assert(buckets_.size() >= size_ && size_ > 0);
+    size_t bucketid = Hash(v.first) % buckets_.size();
+    bool ok = buckets_[bucketid].UniqAppend(v).second;
+    if (!ok) {
+      size_ --;
+    }
+    return ok;
   }
 
   const_iterator Find(const KeyT& key) const {
     if (size_ == 0) {
       return End();
     }
-    assert(max_size_ > 0);
-    size_t bucketid = hash(key) % max_size_;
-    const struct LightList::Node* node = buckets_[bucketid]->head_;
+    assert(buckets_.size() > 0);
+    size_t bucketid = Hash(key) % buckets_.size();
+    const struct LightList::Node* node = buckets_[bucketid].head_;
     while (node != NULL) {
       if (node->value.first == key) {
-        return const_iterator(bucketid, buckets_, max_size_, node);
+        return const_iterator(bucketid, &buckets_, node);
       }
     }
     return End();
@@ -123,36 +167,36 @@ class HashMap {
 
   const_iterator Begin() const {
     size_t bucketid = 0;
-    const struct LightList::Node* node = buckets_[bucketid]->head_;
+    const struct LightList::Node* node = buckets_[bucketid].head_;
     node = node->next;
-    while (node == NULL && bucketid < max_size_) {
+    while (node == NULL && bucketid < buckets_.size()) {
       bucketid ++;
-      node = buckets_[bucketid]->head_;
+      node = buckets_[bucketid].head_;
     }
-    return const_iterator(bucketid, buckets_, max_size_, node);
+    return const_iterator(bucketid, &buckets_, node);
   }
   const_iterator End() const {
-    return const_iterator(0, NULL, 0, NULL);
+    return const_iterator(0, &buckets_, NULL);
   }
 
   void Rehash(size_t maxsize) {
-    const LightList* oldbuckets = buckets_;
-    LightList* newbuckets = (LightList*)malloc(maxsize * sizeof(LightList*));
-    memset(newbuckets, 0, maxsize * sizeof(LightList*));
+    std::vector<LightList> newbuckets(maxsize);
     for (size_t i = 0; i < size_; ++i) {
-      struct LightList::Node* oldnode = buckets_[i]->head_;
+      struct LightList::Node* oldnode = buckets_[i].head_;
       while (oldnode != NULL) {
-        size_t bucketid = hash(oldnode->value) % maxsize; //TODO
-        newbuckets[bucketid]->PushFront(oldnode->value);
+        size_t bucketid = Hash(oldnode->value.first) % maxsize; //TODO
+        newbuckets[bucketid].PushFront(oldnode->value);
       }
     }
-    buckets_ = newbuckets;
-    free(oldbuckets); // TODO
+    buckets_.swap(newbuckets);
   }
  private:
-  LightList* buckets_;
+  size_t Hash(KeyT key) const {
+    return key;
+  }
+
+  std::vector<LightList> buckets_;
   size_t size_;
-  size_t max_size_;
 }; // class HashMap
 
 } // namespace limonp
