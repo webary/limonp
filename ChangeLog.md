@@ -1,5 +1,9 @@
 # limonp ChangeLog
 
+## next version
+
++ Add ForcePublic.hpp
+
 ## v0.5.3
 
 + Fix incompatibility problem about 'time.h' in Windows.
