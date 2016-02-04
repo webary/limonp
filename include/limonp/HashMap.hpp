@@ -89,10 +89,15 @@ class HashMap {
     }
 
     Iterator& operator ++() {
+      assert(buckets_ != NULL);
       assert(node_ != NULL);
       node_ = node_->next;
-      while (node_ == NULL && bucketid_ < buckets_->size()) {
-        bucketid_ ++;
+      //std::cout << __FILE__ << __LINE__ << std::endl;
+      while (node_ == NULL) {
+        ++bucketid_;
+        if (bucketid_ >= buckets_->size()) {
+          break;
+        }
         node_ = (*buckets_)[bucketid_].head_;
       }
       return *this;
@@ -107,9 +112,13 @@ class HashMap {
     }
 
     ValueT* operator -> () {
+      assert(node_ != NULL);
+      assert(bucketid_ < buckets_->size());
       return &node_->value;
     }
     ValueT& operator * () {
+      assert(node_ != NULL);
+      assert(bucketid_ < buckets_->size());
       return node_->value;
     }
    private:
