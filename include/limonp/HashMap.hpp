@@ -6,6 +6,7 @@
 #include <cassert>
 #include <algorithm>
 #include <vector>
+#include <iostream>
 
 namespace limonp {
 
@@ -52,9 +53,11 @@ class HashMap {
     std::pair<ValueT&, bool> UniqAppend(const ValueT& x) {
       struct Node** pp = &head_;
       while ((*pp) != NULL) {
-        if ((*pp)->value == x) {
+        if ((*pp)->value.first == x.first) {
+          (*pp)->value.second = x.second;
           return std::pair<ValueT&, bool>((*pp)->value, false);
         }
+        pp = &(*pp)->next;
       }
       struct Node* node = new Node;
       node->value = x;
@@ -100,7 +103,7 @@ class HashMap {
     }
 
     bool operator != (const Iterator& iter) const {
-      return !((*this) == iter);
+      return node_ != iter.node_;
     }
 
     ValueT* operator -> () {
@@ -161,14 +164,18 @@ class HashMap {
       if (node->value.first == key) {
         return const_iterator(bucketid, &buckets_, node);
       }
+      node = node->next;
     }
     return End();
   }
 
   const_iterator Begin() const {
+    if (buckets_.empty()) {
+      return End();
+    }
     size_t bucketid = 0;
+    assert(bucketid < buckets_.size());
     const struct LightList::Node* node = buckets_[bucketid].head_;
-    node = node->next;
     while (node == NULL && bucketid < buckets_.size()) {
       bucketid ++;
       node = buckets_[bucketid].head_;
@@ -176,16 +183,18 @@ class HashMap {
     return const_iterator(bucketid, &buckets_, node);
   }
   const_iterator End() const {
-    return const_iterator(0, &buckets_, NULL);
+    return const_iterator(buckets_.size(), &buckets_, NULL);
   }
 
   void Rehash(size_t maxsize) {
+    assert(maxsize > 0);
     std::vector<LightList> newbuckets(maxsize);
-    for (size_t i = 0; i < size_; ++i) {
+    for (size_t i = 0; i < buckets_.size(); ++i) {
       struct LightList::Node* oldnode = buckets_[i].head_;
       while (oldnode != NULL) {
         size_t bucketid = Hash(oldnode->value.first) % maxsize; //TODO
         newbuckets[bucketid].PushFront(oldnode->value);
+        oldnode = oldnode->next;
       }
     }
     buckets_.swap(newbuckets);
