@@ -1,4 +1,3 @@
-#include "limonp/ForcePublic.hpp"
 #include "limonp/HashMap.hpp"
 #include "gtest/gtest.h"
 #include <map>
@@ -10,6 +9,29 @@ using namespace std;
 
 static int TEST_DATA[] = {1, 3, 5, 10, 19, 82, 65, 78, 12, 14, 12, 15, 19, 79};
 static int TEST_DATA_NOT_EXISTA[] = {2, 4, 6, 7, 8, 9};
+
+TEST(HashMap, Test0) {
+  const size_t N = 100;
+  HashMap<int, int> mp;
+  ASSERT_EQ(mp.Size(), 0u);
+  ASSERT_EQ(mp.BucketSize(), 0u);
+  for (size_t i = 0; i < N; ++i) {
+    ASSERT_TRUE(mp.Insert(make_pair(i, i)));
+  }
+  ASSERT_EQ(mp.Size(), 100u);
+  ASSERT_EQ(mp.BucketSize(), 163u);
+  for (size_t i = 0; i < N; ++i) {
+    ASSERT_FALSE(mp.Insert(make_pair(i, i)));
+  }
+  ASSERT_EQ(mp.Size(), 100u);
+  ASSERT_EQ(mp.BucketSize(), 163u);
+
+  size_t cur = 0;
+  for (HashMap<int, int>::const_iterator it = mp.Begin(); it != mp.End(); ++it) {
+    ASSERT_EQ(it->second, cur);
+    cur++;
+  }
+}
 
 TEST(HashMap, Test1) {
   HashMap<int, int> mp;
@@ -51,19 +73,19 @@ TEST(HashMap, Test2) {
   ASSERT_NE(it, mp.End());
   ASSERT_EQ(it->first, 1);
   ASSERT_EQ(it->second, 2);
-  ASSERT_EQ(mp.buckets_.size(), 3);
-  ASSERT_EQ(mp.size_, 1);
+  ASSERT_EQ(mp.BucketSize(), 3);
+  ASSERT_EQ(mp.Size(), 1);
   ASSERT_TRUE(mp.Insert(pair<int,int>(5, 1)));
-  ASSERT_EQ(mp.size_, 2);
-  ASSERT_EQ(mp.buckets_.size(), 3);
+  ASSERT_EQ(mp.Size(), 2);
+  ASSERT_EQ(mp.BucketSize(), 3);
   ASSERT_TRUE(mp.Insert(pair<int,int>(3, 1)));
-  ASSERT_EQ(mp.size_, 3);
-  ASSERT_EQ(mp.buckets_.size(), 3);
+  ASSERT_EQ(mp.Size(), 3);
+  ASSERT_EQ(mp.BucketSize(), 3);
   ASSERT_TRUE(mp.Insert(pair<int,int>(4, 1)));
-  ASSERT_EQ(mp.size_, 4);
-  ASSERT_EQ(mp.buckets_.size(), 7);
+  ASSERT_EQ(mp.Size(), 4);
+  ASSERT_EQ(mp.BucketSize(), 7);
 
   mp.Rehash(1);
-  ASSERT_EQ(mp.size_, 4);
-  ASSERT_EQ(mp.buckets_.size(), 1);
+  ASSERT_EQ(mp.Size(), 4);
+  ASSERT_EQ(mp.BucketSize(), 1);
 }

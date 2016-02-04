@@ -91,9 +91,9 @@ class HashMap {
     Iterator& operator ++() {
       assert(node_ != NULL);
       node_ = node_->next;
-      while (node_ == NULL && bucketid_ < buckets_.size()) {
+      while (node_ == NULL && bucketid_ < buckets_->size()) {
         bucketid_ ++;
-        node_ = buckets_[bucketid_]->head_;
+        node_ = (*buckets_)[bucketid_].head_;
       }
       return *this;
     }
@@ -129,6 +129,14 @@ class HashMap {
    : size_(0) {
   }
   ~HashMap() {
+  }
+
+  size_t Size() const {
+    return size_;
+  }
+
+  size_t BucketSize() const {
+    return buckets_.size();
   }
 
   bool Insert(const ValueT& v) {
